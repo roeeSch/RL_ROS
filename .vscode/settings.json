@@ -1,0 +1,11 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/roees/projects/RL_ROS",
+        "/home/roees/rl_env/lib/python3.6/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/roees/projects/RL_ROS",
+        "/home/roees/rl_env/lib/python3.6/site-packages"
+    ]
+
+}
