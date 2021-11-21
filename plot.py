@@ -7,7 +7,7 @@ import os
 # plt
 import pandas as pd
 
-def _add_data(places_data:list,info_data:list,postion:int,color,axis,axis_num:int,axis_name:str):
+def _add_data(places_data:list,info_data:list,postion:int,color,axis,axis_num:int,axis_name:str,nepi:int=None):
     """
     info_data: distance,loss,loss_e,loss_p,loss_v
     """
@@ -29,9 +29,10 @@ def _add_data(places_data:list,info_data:list,postion:int,color,axis,axis_num:in
     axis[axis_num].set_xlabel("episode")
     # set y lable
     axis[axis_num].set_ylabel(axis_name)
+    if nepi is None:
+        nepi = 0
 
-
-    axis[axis_num].scatter(position_episodes, position_info, color=color, label="position {}".format(postion))
+    axis[axis_num].scatter(position_episodes[-nepi:-1], position_info[-nepi:-1], color=color, label="position {}".format(postion))
 
 
 def _get_color_grath_name(place_index,data_index)->(str,str):
@@ -49,7 +50,7 @@ def _get_color_grath_name(place_index,data_index)->(str,str):
     if place_index == 4:
         place_color = "yellow"
     if place_index == 5:
-        place_color = "white"
+        place_color = "magenta"
 
     if data_index == 0:
         grath_name = "reward"
@@ -120,7 +121,7 @@ def plot(folder=None):
             color ,grath_name = _get_color_grath_name(place_index,data_index)
             _add_data(places_data=places,info_data=data_list[data_index], postion=place_index,color=color,axis= axis,
                           axis_num=data_index,
-                axis_name=grath_name)
+                axis_name=grath_name, nepi=350)
     labels = []
     for ax in fig.axes:
         _, axLabel = ax.get_legend_handles_labels()
