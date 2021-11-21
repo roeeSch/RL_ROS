@@ -160,12 +160,26 @@ class Agent_rl:
         
         self.lock_cb = threading.Lock()
 
-        model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
-        laser_sub = message_filters.Subscriber('scan', LaserScan) #every 0.2 sec
-        ts = message_filters.ApproximateTimeSynchronizer([model_sub, laser_sub], queue_size=1, slop=0.05, allow_headerless=True)
-        #ts = message_filters.TimeSynchronizer([info, laser], 1)
-        ts.registerCallback(self.training_loop)
+        self.registerCallbacks(self.training_loop)
         rospy.spin()
+
+    def clearCallbacks(self):
+        self.model_sub.sub.unregister()
+        self.laser_sub.sub.unregister()
+        del self.model_sub
+        del self.laser_sub
+        del self.ts
+        # self.ts.queues.clear()
+        
+    def registerCallbacks(self, cb_fun):
+
+        self.model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
+        self.laser_sub = message_filters.Subscriber('scan', LaserScan) #every 0.2 sec
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.model_sub, self.laser_sub], queue_size=1, slop=0.05, allow_headerless=True)
+        
+        #ts = message_filters.TimeSynchronizer([info, laser], 1)
+        self.ts.registerCallback(cb_fun)
+
     
     def eval(self, folder=None, from_episode=None):
 
@@ -200,12 +214,12 @@ class Agent_rl:
         self.env.eval()
         self.env.initial()
 
-        
-        model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
-        laser_sub = message_filters.Subscriber('scan', LaserScan) #every 0.2 sec
-        ts = message_filters.ApproximateTimeSynchronizer([model_sub, laser_sub], queue_size=1, slop=0.05, allow_headerless=True)
-        #ts = message_filters.TimeSynchronizer([info, laser], 1)
-        ts.registerCallback(self.test)
+        self.registerCallbacks(self.test)
+        # model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
+        # laser_sub = message_filters.Subscriber('scan', LaserScan) #every 0.2 sec
+        # ts = message_filters.ApproximateTimeSynchronizer([model_sub, laser_sub], queue_size=1, slop=0.05, allow_headerless=True)
+        # #ts = message_filters.TimeSynchronizer([info, laser], 1)
+        # ts.registerCallback(self.test)
         rospy.spin()
     
     def test(self, model_info, laser_info):
@@ -281,6 +295,7 @@ class Agent_rl:
                 
                 # if final state
                 else:
+                    self.clearCallbacks()
                     print('---- reached final state ----')
                     print(is_done)
                     self.memory.push_episode()
@@ -356,6 +371,7 @@ class Agent_rl:
                     self.last_action = None
 
                     place = self.env.initial()
+                    self.registerCallbacks(self.training_loop)
                     self.data["place"].append(place)
                     self.episode_num+=1
                     self.lock_cb.release()

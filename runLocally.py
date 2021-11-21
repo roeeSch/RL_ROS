@@ -5,7 +5,7 @@ import signal
 from multiprocessing import Pool
 import errno
 from contextlib import contextmanager
-TIME = 2 * 60  # (30 min)
+TIME = 30 * 60  # (30 min)
 from functools import wraps
 
 import os
@@ -36,7 +36,7 @@ from testEnvVars import my_env_mod
 # # import pdb;pdb.set_trace()
 my_env_mod['PKG_CONFIG_PATH'] = '/home/roees/tmp_ws/devel/lib/pkgconfig:'+my_env_mod['PKG_CONFIG_PATH']
 my_env_mod['LD_LIBRARY_PATH'] = '/home/roees/tmp_ws/devel/lib:'+my_env_mod['LD_LIBRARY_PATH']
-command_run_simulation  = '~/tmp_ws/src/cf_simple_sim/utils/simulator.sh gui:=true'
+command_run_simulation  = '~/tmp_ws/src/cf_simple_sim/utils/simulator.sh gui:=false'
 sim_proc = subprocess.Popen([command_run_simulation], shell=True, stdout=fid_sim_out, stderr=fid_sim_err, env=my_env_mod)
 proc_list.append(sim_proc)
 time.sleep(5)

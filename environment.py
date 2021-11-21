@@ -663,7 +663,8 @@ class SimpleEnvTrain (SimpleEnv):
         rospy.wait_for_service('/gazebo/set_model_state')
 
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
-        resp = set_state( init_state )
+        rospy.loginfo(f'switched loc: ind={ind}, place={place}')
+        resp = set_state( init_state )  # TODO: add print to switched state
         return place
 
 
