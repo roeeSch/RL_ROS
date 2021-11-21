@@ -11,6 +11,7 @@ import message_filters
 import os
 import pickle
 import random
+import threading
 #from tf2_py.transformations import euler_from_quaternion
 # a2c, ppo, sac  ,stable baseline 3
 # roslaunch tof2lidar lidar2tof.launch
@@ -157,6 +158,8 @@ class Agent_rl:
         place = self.env.initial()
         self.data["place"].append(place)
         
+        self.lock_cb = threading.Lock()
+
         model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
         laser_sub = message_filters.Subscriber('scan', LaserScan) #every 0.2 sec
         ts = message_filters.ApproximateTimeSynchronizer([model_sub, laser_sub], queue_size=1, slop=0.05, allow_headerless=True)
@@ -249,108 +252,116 @@ class Agent_rl:
 
 
     def training_loop(self, model_info, laser_info):
-        
-        curr_state, is_done, reward = self.env.get_state(model_info, laser_info)
-
-        # if not initial state
-        if not self.last_state is None:
-            experience = Experience(
-                    state=self.last_state,
-                    next_state=curr_state,
-                    scores=self.scores,
-                    action=self.last_action,
-                    reward=reward,
-                    qval=0,
-                    is_done=bool(is_done),
-                )
-            self.memory.push_experience(experience)
-            self.episode_steps += 1
-            self.episode_reward += reward
-        
-        # if not final state
-        if not bool(is_done):
-            self.last_state = curr_state
-        
-            self.step()
-        
-        # if final state
-        else:
-            print('---- reached final state ----')
-            print(is_done)
-            self.memory.push_episode()
-            # for graphs
-            self.data["reward"].append(self.episode_reward)
-            self.data["distance"].append(self.episode_steps)
-
-            rospy.loginfo(f"Ended episode {self.episode_num}")
-            
-
-            # train
+        # TODO: add lock so that an inturruptin ls doesnt disrupt sequence ?
+        # '.initial()' doesnt execute ?
+        if self.lock_cb.acquire(blocking=False):
             try:
-                losses = []
-                losses_e, losses_p, losses_v = [], [], []
-                for batch in self.memory.get_batch(self.gradient_steps if self.gradient_steps>0 else self.episode_steps):
-                    loss, loss_dict = self.trainer.train(batch)
-                    losses.append(loss)
-                    losses_e.append(loss_dict["loss_e"] if "loss_e" in loss_dict else -1)
-                    losses_p.append(loss_dict["loss_p"] if "loss_p" in loss_dict else -1)
-                    losses_v.append(loss_dict["loss_v"] if "loss_v" in loss_dict else -1)
+                curr_state, is_done, reward = self.env.get_state(model_info, laser_info)
+
+                # if not initial state
+                if not self.last_state is None:
+                    experience = Experience(
+                            state=self.last_state,
+                            next_state=curr_state,
+                            scores=self.scores,
+                            action=self.last_action,
+                            reward=reward,
+                            qval=0,
+                            is_done=bool(is_done),
+                        )
+                    self.memory.push_experience(experience)
+                    self.episode_steps += 1
+                    self.episode_reward += reward
                 
-                def mean(l):
-                    return sum(l)/len(l) if len(l)>0 else -1
+                # if not final state
+                if not bool(is_done):
+                    self.last_state = curr_state
+                
+                    self.step()
+                
+                # if final state
+                else:
+                    print('---- reached final state ----')
+                    print(is_done)
+                    self.memory.push_episode()
+                    # for graphs
+                    self.data["reward"].append(self.episode_reward)
+                    self.data["distance"].append(self.episode_steps)
 
-                rospy.loginfo(f"total_loss = {mean(losses)}")
-                self.data["loss"].append(mean(losses))
-                self.data["loss_e"].append(mean(losses_e))
-                self.data["loss_p"].append(mean(losses_p))
-                self.data["loss_v"].append(mean(losses_v))
-            
+                    rospy.loginfo(f"Ended episode {self.episode_num}")
+                    
+
+                    # train
+                    try:
+                        losses = []
+                        losses_e, losses_p, losses_v = [], [], []
+                        for batch in self.memory.get_batch(self.gradient_steps if self.gradient_steps>0 else self.episode_steps):
+                            loss, loss_dict = self.trainer.train(batch)
+                            losses.append(loss)
+                            losses_e.append(loss_dict["loss_e"] if "loss_e" in loss_dict else -1)
+                            losses_p.append(loss_dict["loss_p"] if "loss_p" in loss_dict else -1)
+                            losses_v.append(loss_dict["loss_v"] if "loss_v" in loss_dict else -1)
+                        
+                        def mean(l):
+                            return sum(l)/len(l) if len(l)>0 else -1
+
+                        rospy.loginfo(f"total_loss = {mean(losses)}")
+                        self.data["loss"].append(mean(losses))
+                        self.data["loss_e"].append(mean(losses_e))
+                        self.data["loss_p"].append(mean(losses_p))
+                        self.data["loss_v"].append(mean(losses_v))
+                    
+                    except Exception as e:
+                        rospy.loginfo(e)
+                        self.data["loss"].append(-1)
+                        self.data["loss_e"].append(-1)
+                        self.data["loss_p"].append(-1)
+                        self.data["loss_v"].append(-1)
+
+                    # save
+                    if not self.save_every is None and self.episode_num % self.save_every == 0:
+                        torch.save(self.policy.state_dict(), f"{self.folder}model_{self.episode_num}")
+                        with open(f"{self.folder}reward", 'ab') as f:
+                            np.save(f, self.data["reward"])
+                        with open(f"{self.folder}loss", 'ab') as f:
+                            np.save(f, self.data["loss"])
+                        with open(f"{self.folder}loss_e", 'ab') as f:
+                            np.save(f, self.data["loss_e"])
+                        with open(f"{self.folder}loss_p", 'ab') as f:
+                            np.save(f, self.data["loss_p"])
+                        with open(f"{self.folder}loss_v", 'ab') as f:
+                            np.save(f, self.data["loss_v"])
+                        with open(f"{self.folder}distance", 'ab') as f:
+                            np.save(f, self.data["distance"])
+                        with open(f"{self.folder}place", 'ab') as f:
+                            np.save(f, self.data["place"])
+                        self.data["reward"] = []
+                        self.data["distance"] = []
+                        self.data["loss"] = []
+                        self.data["loss_e"] = []
+                        self.data["loss_p"] = []
+                        self.data["loss_v"] = []
+                        self.data["place"] = []
+                        self.memory.save_data(f"{self.folder}memory.pkl")
+                        with open(f"{self.folder}eps", 'wb') as f:
+                            np.save(f, self.eps)
+                        with open(f"{self.folder}entropy", 'wb') as f:
+                            np.save(f, self.trainer.entropy_coef)
+                        rospy.loginfo("saved!!!")
+
+                    #start new episode, initial place
+                    self.episode_steps = 0
+                    self.episode_reward = 0.0
+                    self.last_state = None
+                    self.last_action = None
+
+                    place = self.env.initial()
+                    self.data["place"].append(place)
+                    self.episode_num+=1
+                    self.lock_cb.release()
+                    return None
             except Exception as e:
-                rospy.loginfo(e)
-                self.data["loss"].append(-1)
-                self.data["loss_e"].append(-1)
-                self.data["loss_p"].append(-1)
-                self.data["loss_v"].append(-1)
+                self.lock_cb.release()
+                raise e
 
-            # save
-            if not self.save_every is None and self.episode_num % self.save_every == 0:
-                torch.save(self.policy.state_dict(), f"{self.folder}model_{self.episode_num}")
-                with open(f"{self.folder}reward", 'ab') as f:
-                    np.save(f, self.data["reward"])
-                with open(f"{self.folder}loss", 'ab') as f:
-                    np.save(f, self.data["loss"])
-                with open(f"{self.folder}loss_e", 'ab') as f:
-                    np.save(f, self.data["loss_e"])
-                with open(f"{self.folder}loss_p", 'ab') as f:
-                    np.save(f, self.data["loss_p"])
-                with open(f"{self.folder}loss_v", 'ab') as f:
-                    np.save(f, self.data["loss_v"])
-                with open(f"{self.folder}distance", 'ab') as f:
-                    np.save(f, self.data["distance"])
-                with open(f"{self.folder}place", 'ab') as f:
-                    np.save(f, self.data["place"])
-                self.data["reward"] = []
-                self.data["distance"] = []
-                self.data["loss"] = []
-                self.data["loss_e"] = []
-                self.data["loss_p"] = []
-                self.data["loss_v"] = []
-                self.data["place"] = []
-                self.memory.save_data(f"{self.folder}memory.pkl")
-                with open(f"{self.folder}eps", 'wb') as f:
-                    np.save(f, self.eps)
-                with open(f"{self.folder}entropy", 'wb') as f:
-                    np.save(f, self.trainer.entropy_coef)
-                rospy.loginfo("saved!!!")
-
-            #start new episode, initial place
-            self.episode_steps = 0
-            self.episode_reward = 0.0
-            self.last_state = None
-            self.last_action = None
-
-            place = self.env.initial()
-            self.data["place"].append(place)
-            self.episode_num+=1
-
-            return None
+            self.lock_cb.release()

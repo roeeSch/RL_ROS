@@ -281,7 +281,8 @@ class Env:
         state = torch.cat((ranges, position, orientation, vel), dim=-1)
         return_state = torch.cat((ranges, vel), dim=-1)
         is_done, reward = self.rewarder(state)
-
+        rospy.loginfo(f"position={position}")
+        ## Add log here !!!  XXX
         return return_state, is_done, reward
     
     def step(self, action :int):
@@ -330,8 +331,10 @@ class SimpleEnv (Env):
         vel = torch.Tensor([linear_vel, angular_vel])
         
         ranges = self.preprocess_ranges(laser.ranges)
-
+        r_min = np.min(np.array(ranges))
+        r_right = np.min(np.array(ranges[-5:-2]))
         state = torch.cat((ranges, position, orientation, vel), dim=-1)
+        rospy.loginfo("position=({:.2f},{:.2f}), min range = {:.2f}, right range = {:.2f}".format(position.tolist()[0],position.tolist()[1],r_min, r_right))
 
         is_done, reward = self.rewarder(state)
 
@@ -571,7 +574,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = -15
-            state.pose.position.y = 8
+            state.pose.position.y = 8.28
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -585,7 +588,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = 13
-            state.pose.position.y = 13.8
+            state.pose.position.y = 14.18
             state.pose.position.z = 0
             state.pose.orientation.x = ori1[0]
             state.pose.orientation.y = ori1[1]
@@ -597,7 +600,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = 12.5
-            state.pose.position.y = 19.1
+            state.pose.position.y = 19.67
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -609,7 +612,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = 12.5
-            state.pose.position.y = 20.6
+            state.pose.position.y = 20.7
             state.pose.position.z = 0
             state.pose.orientation.x = ori1[0]
             state.pose.orientation.y = ori1[1]
@@ -621,7 +624,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = 13
-            state.pose.position.y = 12.3
+            state.pose.position.y = 12.8
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -633,15 +636,16 @@ class SimpleEnvTrain (SimpleEnv):
         
         self.num_states = len(self.init_states)
     
-    def initial(self):
+    def initial(self, ind=None):
 
         # 0-1 line
         # 2-5 small square
         # 6-9 big square
         # 10-13 meshushe
         # 14-17 circle
-
-        ind = randint(0,self.num_states-1) if self.random_init else 0
+        if ind is None:
+            ind = randint(0,self.num_states-1) if self.random_init else 0
+        
         place = None
         if 0<=ind<=1:
             place = 1
