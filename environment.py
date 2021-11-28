@@ -410,7 +410,7 @@ class SimpleEnvTrain (SimpleEnv):
         state = ModelState()
         state.model_name = self.model_name
         state.pose.position.x = -1
-        state.pose.position.y = 0.1
+        state.pose.position.y = 0.3
         state.pose.position.z = 0
         state.pose.orientation.x = ori1[0]
         state.pose.orientation.y = ori1[1]
@@ -424,7 +424,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = -1
-            state.pose.position.y = -1.4
+            state.pose.position.y = -1.25
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -447,10 +447,10 @@ class SimpleEnvTrain (SimpleEnv):
 
             self.init_states.append(state)
 
-            state = ModelState()
+            state = ModelState()  # ind == 3
             state.model_name = self.model_name
             state.pose.position.x = 12.2
-            state.pose.position.y = -14.9
+            state.pose.position.y = -14.6
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -471,10 +471,10 @@ class SimpleEnvTrain (SimpleEnv):
 
             self.init_states.append(state)
 
-            state = ModelState()
+            state = ModelState()  # ind=5 small box outside
             state.model_name = self.model_name
             state.pose.position.x = 12.2
-            state.pose.position.y = -18.2
+            state.pose.position.y = -18
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -485,10 +485,10 @@ class SimpleEnvTrain (SimpleEnv):
             ###############
 
             ############### big square
-            state = ModelState()
+            state = ModelState()  # ind==6, inner large square
             state.model_name = self.model_name
             state.pose.position.x = -15
-            state.pose.position.y = -17
+            state.pose.position.y = -16.9
             state.pose.position.z = 0
             state.pose.orientation.x = ori1[0]
             state.pose.orientation.y = ori1[1]
@@ -500,7 +500,7 @@ class SimpleEnvTrain (SimpleEnv):
             state = ModelState()
             state.model_name = self.model_name
             state.pose.position.x = -15
-            state.pose.position.y = -13.2
+            state.pose.position.y = -13.0
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -547,10 +547,10 @@ class SimpleEnvTrain (SimpleEnv):
 
             self.init_states.append(state)
 
-            state = ModelState()
+            state = ModelState()  # ind 11, 
             state.model_name = self.model_name
             state.pose.position.x = -15
-            state.pose.position.y = 19.15
+            state.pose.position.y = 19.3
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
@@ -625,6 +625,21 @@ class SimpleEnvTrain (SimpleEnv):
             state.model_name = self.model_name
             state.pose.position.x = 13
             state.pose.position.y = 12.8
+            state.pose.position.z = 0
+            state.pose.orientation.x = ori2[0]
+            state.pose.orientation.y = ori2[1]
+            state.pose.orientation.z = ori2[2]
+            state.pose.orientation.w = ori2[3]
+
+            self.init_states.append(state)
+            ###############
+
+            
+            ############### New
+            state = ModelState()
+            state.model_name = self.model_name
+            state.pose.position.x = -0.5
+            state.pose.position.y = -3.2
             state.pose.position.z = 0
             state.pose.orientation.x = ori2[0]
             state.pose.orientation.y = ori2[1]
