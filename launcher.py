@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # device="cuda"
     device="cpu"
     verbose = False
-    eval = False  # only testing
+    eval = True  # only testing
     ########################    
     
     ######################## environment initialization

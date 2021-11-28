@@ -16,7 +16,7 @@ import threading
 # a2c, ppo, sac  ,stable baseline 3
 # roslaunch tof2lidar lidar2tof.launch
 
-eps_gamma = 0.97
+eps_gamma = 0.9994
 
 #TODO: waypoints for objection, better reward (max dist), 16 bins instead of 18, loss graph, velocity changes
 # objection function better, add 0.1 entropy loss
@@ -35,7 +35,10 @@ class Agent_rl:
             self.device = torch.device("cuda" if device=="cuda" and torch.cuda.is_available() else "cpu")
         else:
             self.device = device
+
+        self.lock_cb = threading.Lock()
         rospy.loginfo(f"Using device: {self.device}")
+        self.ind=None
 
     
     def check_parameters(self):
@@ -49,8 +52,8 @@ class Agent_rl:
             assert self.parameters[k] == parameters[k], "different parameters."
 
 
-    def train(self, trainer, buffer_size=50, batch_size=10, gamma=0.99, eps=0, gradient_steps=1, off_policy=True, save_every=None, folder=None, from_episode=None, **kw):
-
+    def train(self, trainer, buffer_size=50, batch_size=10, gamma=0.99, eps=0, gradient_steps=1, off_policy=True, save_every=None, folder=None, ind=None, from_episode=None, **kw):
+        self.ind = ind
         self.memory = ReplayMemory(
             buffer_size = buffer_size, 
             batch_size = batch_size, 
@@ -154,11 +157,15 @@ class Agent_rl:
         self.data["loss_p"] = []
         self.data["loss_v"] = []
         self.data["place"] = []
+        self.data["eps"] = []
 
-        place = self.env.initial()
+        if ind is None:
+            place = self.env.initial()
+        else:
+            place = self.env.initial(self.ind)
         self.data["place"].append(place)
         
-        self.lock_cb = threading.Lock()
+        # self.lock_cb = threading.Lock()
 
         self.registerCallbacks(self.training_loop)
         rospy.spin()
@@ -181,11 +188,11 @@ class Agent_rl:
         self.ts.registerCallback(cb_fun)
 
     
-    def eval(self, folder=None, from_episode=None):
+    def eval(self, folder=None, from_episode=None, ind=None):
 
         self.episode_num = 1
         self.eps = 0 # for no exploration
-
+        self.ind = ind
         self.last_state = None
         self.last_action = None
 
@@ -212,7 +219,10 @@ class Agent_rl:
             rospy.loginfo("Loaded from "+model)
         
         self.env.eval()
-        self.env.initial()
+        if self.ind is not None:
+            self.env.initial(self.ind)
+        else:
+            self.env.initial()
 
         self.registerCallbacks(self.test)
         # model_sub = message_filters.Subscriber('gazebo/model_states', ModelStates)
@@ -224,24 +234,33 @@ class Agent_rl:
     
     def test(self, model_info, laser_info):
         
-        curr_state, is_done, _ = self.env.get_state(model_info, laser_info)
-        
-        if not is_done:
+        if self.lock_cb.acquire(blocking=False):
+            try:
+                curr_state, is_done, _ = self.env.get_state(model_info, laser_info)
+                if not is_done:
 
-            self.last_state = curr_state
-        
-            self.step()
-        
-        else:
+                    self.last_state = curr_state
+                
+                    self.step()
+                    self.lock_cb.release()
+                else:
+                    self.clearCallbacks()
+                    self.last_state = None
+                    self.last_action = None
+                    rospy.loginfo("Ended episode "+str(self.episode_num))
 
-            self.last_state = None
-            self.last_action = None
-            rospy.loginfo("Ended episode "+str(self.episode_num))
+                    #start new episode, initial place
+                    if self.ind is not None:
+                        self.env.initial(self.ind)
+                    else:
+                        self.env.initial()
+                    self.registerCallbacks(self.test)
+                    self.episode_num+=1
+                    self.lock_cb.release()
+            except Exception as e:
+                self.lock_cb.release()
+                raise e
 
-            #start new episode, initial place
-            self.env.initial()
-            self.episode_num+=1
-    
     
     def step(self):
         
@@ -270,8 +289,13 @@ class Agent_rl:
         # '.initial()' doesnt execute ?
         if self.lock_cb.acquire(blocking=False):
             try:
+                num_exp = self.env.rewarder.num_exp
                 curr_state, is_done, reward = self.env.get_state(model_info, laser_info)
-
+                if is_done:
+                    self.env.train_max_score[self.env.train_ind]*=0.85
+                    self.env.train_max_score[self.env.train_ind]+=0.15*num_exp
+                    min_steps = np.min(self.env.train_max_score)
+                    self.env.rewarder.current_dest = max(self.env.rewarder.current_dest,min_steps+10)
                 # if not initial state
                 if not self.last_state is None:
                     experience = Experience(
@@ -350,6 +374,9 @@ class Agent_rl:
                             np.save(f, self.data["distance"])
                         with open(f"{self.folder}place", 'ab') as f:
                             np.save(f, self.data["place"])
+                        with open(f"{self.folder}eps", 'ab') as f:
+                            np.save(f, self.eps)
+                            
                         self.data["reward"] = []
                         self.data["distance"] = []
                         self.data["loss"] = []
@@ -357,12 +384,13 @@ class Agent_rl:
                         self.data["loss_p"] = []
                         self.data["loss_v"] = []
                         self.data["place"] = []
+                        self.data["eps"] = []
                         self.memory.save_data(f"{self.folder}memory.pkl")
                         with open(f"{self.folder}eps", 'wb') as f:
                             np.save(f, self.eps)
                         with open(f"{self.folder}entropy", 'wb') as f:
                             np.save(f, self.trainer.entropy_coef)
-                        rospy.loginfo("saved!!!")
+                        rospy.loginfo("saved!!!, eps={}".format(self.eps))
 
                     #start new episode, initial place
                     self.episode_steps = 0

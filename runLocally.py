@@ -5,7 +5,7 @@ import signal
 from multiprocessing import Pool
 import errno
 from contextlib import contextmanager
-TIME = 30 * 60  # (30 min)
+TIME = 12 * 60 * 60  # [seconds]
 from functools import wraps
 
 import os

@@ -160,6 +160,9 @@ class Env:
         self.pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
         self.num_of_bins = num_of_bins
         self.eval_=False
+        self.train_ind = None
+        self.train_place = None
+        self.train_max_score = None
 
         self.parameters = {"class": self.__class__, 
         "velocity_handler": self.velocity_handler.parameters, 
@@ -356,7 +359,7 @@ class SimpleEnv (Env):
         return pos_x, pos_y, z
     
     def step(self, action :int):
-
+        # TODO: add innertia to velocity commands OR travel at constant rotation
         x, y = self.velocity_handler.category_to_velocity(action)
 
         pos_x, pos_y, z = self.get_pos_z(x, y)
@@ -650,6 +653,7 @@ class SimpleEnvTrain (SimpleEnv):
             ###############
         
         self.num_states = len(self.init_states)
+        self.train_max_score = np.zeros((self.num_states,))
     
     def initial(self, ind=None):
 
@@ -658,6 +662,9 @@ class SimpleEnvTrain (SimpleEnv):
         # 6-9 big square
         # 10-13 meshushe
         # 14-17 circle
+        if np.sum(self.train_max_score)>0:
+            ind = np.argsort(self.train_max_score)[randint(0,4)]
+        
         if ind is None:
             ind = randint(0,self.num_states-1) if self.random_init else 0
         
@@ -682,6 +689,8 @@ class SimpleEnvTrain (SimpleEnv):
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         rospy.loginfo(f'switched loc: ind={ind}, place={place}')
         resp = set_state( init_state )  # TODO: add print to switched state
+        self.train_ind = ind
+        self.train_place = place
         return place
 
 
@@ -745,7 +754,7 @@ class SimpleRightHand(Rewarder):
         self.out = 0
         self.in_a_row = 0
         super().__init__()
-    
+
     def get_stats(self, state):
 
         state = state.tolist()
@@ -803,7 +812,7 @@ class SimpleRightHand(Rewarder):
                 if self.in_a_row>=dest:
                     self.in_a_row = 0
                     reason = 'reached destination {} in a row: {}'.format(self.in_a_row, self.current_dest)
-                    self.current_dest += 10
+                    # self.current_dest += 10
                     rospy.loginfo(f"Did it!!!!!!!!!!!! Destination is {self.current_dest}")
                 else:
                     reason = 'reached destination {} NOT in a row: {}'.format(self.in_a_row, self.current_dest)
