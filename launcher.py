@@ -256,7 +256,7 @@ if __name__ == '__main__':
         agent.train(
             trainer, 
             save_every=save_every, 
-            folder=f"saved_models/model_{alg}",
+            folder=None, # f"saved_models/model_{alg}",
             from_episode=-1,
             **chosen_params)
     else:
