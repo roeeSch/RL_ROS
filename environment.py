@@ -670,8 +670,10 @@ class SimpleEnvTrain (SimpleEnv):
             place = 3
         elif 10<=ind<=13:
             place = 4
-        else:
+        elif 14<=ind<=17:
             place = 5
+        else:
+            place = 6
         # ind = randint(14,17) if self.random_init else 0
         init_state = self.init_states[ind]
 
